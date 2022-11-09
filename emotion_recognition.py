@@ -177,6 +177,7 @@ class EmotionRecognizer:
         and predicts the emotion
         """
         feature = extract_feature(audio_path, **self.audio_config).reshape(1, -1)
+
         return self.model.predict(feature)[0]
 
     def predict_proba(self, audio_path):
