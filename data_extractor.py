@@ -110,7 +110,6 @@ class AudioExtractor:
             features = []
             append = features.append
             for audio_file in tqdm.tqdm(audio_paths, f"Extracting features for {partition}"):
-                print(f"audio_file:{audio_file}, partition: {partition}")
                 feature = extract_feature(audio_file, **self.audio_config)
                 if self.input_dimension is None:
                     self.input_dimension = feature.shape[0]
