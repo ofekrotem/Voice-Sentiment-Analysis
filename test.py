@@ -159,7 +159,7 @@ if __name__ == "__main__":
 
     # Parse the arguments passed
     args = parser.parse_args()
-
+    all_emotions = "neutral,calm,happy,sad,angry,fear,disgust,ps,boredom"
     features = ["mfcc", "chroma", "mel"]
     detector = EmotionRecognizer(estimator_dict[args.model], emotions=args.emotions.split(","), features=features,
                                  verbose=0)

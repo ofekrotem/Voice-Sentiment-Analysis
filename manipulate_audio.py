@@ -1,5 +1,8 @@
 import operator
 import random
+
+import pydub.effects
+
 import convert_wavs
 from pydub import AudioSegment
 import os
@@ -67,16 +70,16 @@ def add_white_noise(audio):
     return audio.overlay(noise)
 
 
+def change_speed(audio):
+    return pydub.effects.speedup(audio, playback_speed=1.5)
+
+
 def decide_manipulate():
     return random.randint(0, 1)
 
 
-global vol_counter
-global white_counter
-global both_counter
-vol_counter = 0
-white_counter = 0
-both_counter = 0
+global changed_counter
+changed_counter = 0
 
 
 def manipulate_audio_file(path, name):
@@ -85,26 +88,89 @@ def manipulate_audio_file(path, name):
     1. Changes the volume of each 1/3 length of the audio file
     (Randomly chooses 1/3 increased volume, 1/3 normal volume, 1/3 decreased volume)
     2. Add white noise in the background
+    3. Change speed of audio (slow down/speed up)
     """
-    global vol_counter, white_counter, both_counter
     audio = AudioSegment.from_wav(path)
     decide_vol = decide_manipulate()
     decide_white = decide_manipulate()
-    if decide_vol and decide_white:
+    decide_speed = decide_manipulate()
+    if decide_vol:
         audio = change_vol(audio)
-        audio = add_white_noise(audio)
-        both_counter = both_counter + 1
-        print(f"Changed both for {path}")
-    elif decide_vol:
-        audio = change_vol(audio)
-        vol_counter = vol_counter + 1
         print(f"Changed vol for {path}")
-    elif decide_white:
+    if decide_white:
         audio = add_white_noise(audio)
-        white_counter = white_counter + 1
         print(f"Added white to {path}")
-    if decide_vol or decide_white:
+    if decide_speed:
+        audio = change_speed(audio)
+        print(f"Changed speed for {path}")
+    if decide_vol or decide_white or decide_speed:
+        global changed_counter
+        changed_counter = changed_counter + 1
         export_audio_to_dir(audio, path, name)
+
+
+global unique
+unique = 0
+
+
+def save_with_new_emotion(audio, path, is_dot, emotion):
+    global unique
+    if is_dot:
+        index = path.rfind('.') - 2
+        new_path = f"{path[:index]}{unique}{emotion}{path[index + 1:]}"
+        unique = unique + 1
+    else:
+        index = path.rfind('_')
+        new_path = f"{path[:index]}{unique}_{emotion}.wav"
+        unique = unique + 1
+
+    convert_wavs.convert_audio(path, new_path, True)
+    print(f"saved {path} as {new_path}")
+
+
+def unite_data_to_three_emotions(path, name):
+    categories = {
+        "W": "angry",
+        "L": "boredom",
+        "E": "disgust",
+        "A": "fear",
+        "F": "happy",
+        "T": "sad",
+        "N": "neutral"
+    }
+    audio = AudioSegment.from_wav(path)
+    positive_emotions = ["ps"]
+    negative_emotions = ["angry", "disgust", "fear", "W", "E", "A"]
+    neutral_emotions = ["boredom", "calm", "L"]
+    is_dot = False
+    if '_' in name:
+        start_index = name.rfind('_') + 1
+        end_index = name.rfind('.')
+        emotion = name[start_index:end_index]
+    else:
+        index = path.rfind('.')
+        emotion = path[index - 2:index - 1]
+        is_dot = True
+    if emotion in positive_emotions:
+        if is_dot:
+            emotion = "F"
+        else:
+            emotion = "happy"
+        save_with_new_emotion(audio, path, is_dot, emotion)
+    elif emotion in negative_emotions:
+        if is_dot:
+            emotion = "T"
+        else:
+            emotion = "sad"
+        save_with_new_emotion(audio, path, is_dot, emotion)
+    elif emotion in neutral_emotions:
+        if is_dot:
+            emotion = "N"
+        else:
+            emotion = "neutral"
+        save_with_new_emotion(audio, path, is_dot, emotion)
+    else:
+        pass
 
 
 def search_in_folder(path):
@@ -116,11 +182,9 @@ def search_in_folder(path):
             search_in_folder(file)
         else:
             if decide_manipulate():
-                print(file.name)
                 manipulate_audio_file(file.path, file.name)
 
 
-search_in_folder('.\data')
-print(f"Manipulated vol: {vol_counter} files")
-print(f"Manipulated white: {white_counter} files")
-print(f"Manipulated both: {both_counter} files")
+search_in_folder('./data')
+
+print(f"Manipulated: {changed_counter} files")
