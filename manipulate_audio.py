@@ -6,8 +6,8 @@ import pydub.effects
 import convert_wavs
 from pydub import AudioSegment
 import os
-
-from pydub.generators import WhiteNoise
+import progressbar
+import time
 
 global counter
 
@@ -65,11 +65,6 @@ def change_vol(audio):
     return new_audio
 
 
-def add_white_noise(audio):
-    noise = WhiteNoise().to_audio_segment(duration=len(audio), volume=-35)
-    return audio.overlay(noise)
-
-
 def change_speed(audio):
     return pydub.effects.speedup(audio, playback_speed=1.5)
 
@@ -82,6 +77,15 @@ global changed_counter
 changed_counter = 0
 
 
+def add_background_noise(audio):
+    noise_list = ["birds.wav", "farm.wav", "people.wav", "rain.wav", "sea.wav", "white_noise.wav", "wind.wav"]
+    decide_noise = random.randint(0, 6)
+    noise_file = "./background_noises/" + noise_list[decide_noise]
+    noise = AudioSegment.from_wav(noise_file)
+    noise = noise[:len(audio)] - 18
+    return audio.overlay(noise)
+
+
 def manipulate_audio_file(path, name):
     """
     This function takes .wav files and does the following:
@@ -91,19 +95,20 @@ def manipulate_audio_file(path, name):
     3. Change speed of audio (slow down/speed up)
     """
     audio = AudioSegment.from_wav(path)
-    decide_vol = decide_manipulate()
-    decide_white = decide_manipulate()
-    decide_speed = decide_manipulate()
+    decide_vol = False
+    decide_speed = False
+    decide_background = True
+
+    if decide_background:
+        audio = add_background_noise(audio)
+        print(f"Added background to {path}")
     if decide_vol:
         audio = change_vol(audio)
         print(f"Changed vol for {path}")
-    if decide_white:
-        audio = add_white_noise(audio)
-        print(f"Added white to {path}")
     if decide_speed:
         audio = change_speed(audio)
         print(f"Changed speed for {path}")
-    if decide_vol or decide_white or decide_speed:
+    if decide_vol or decide_speed or decide_background:
         global changed_counter
         changed_counter = changed_counter + 1
         export_audio_to_dir(audio, path, name)
@@ -177,12 +182,15 @@ def search_in_folder(path):
     """
     Search in path folder for all files (not folders)
     """
+    global changed_counter
     for file in os.scandir(path):
-        if not file.is_file():
-            search_in_folder(file)
-        else:
-            if decide_manipulate():
-                manipulate_audio_file(file.path, file.name)
+        if "train" in file.path:
+
+            if not file.is_file():
+                search_in_folder(file)
+            else:
+                if decide_manipulate():
+                    manipulate_audio_file(file.path, file.name)
 
 
 search_in_folder('./data')
