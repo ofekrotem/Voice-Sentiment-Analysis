@@ -4,6 +4,7 @@
 - The basic idea behind this tool is to build and train/test a suited machine learning ( as well as deep learning ) algorithm that could recognize and detects human emotions from speech.
 - This is useful for many industry fields such as making product recommendations, affective computing, etc.
 - Check this [tutorial](https://www.thepythoncode.com/article/building-a-speech-emotion-recognizer-using-sklearn) for more information.
+- [Audio manipulating statistics](https://docs.google.com/spreadsheets/d/1YvXftpamvPDj99aFOCRIR4iPiF4mWvtU1IegiEycoMA/edit?usp=sharing)
 ## Requirements
 - **Python 3.6+**
 ### Python Packages
