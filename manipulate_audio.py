@@ -6,8 +6,6 @@ import pydub.effects
 import convert_wavs
 from pydub import AudioSegment
 import os
-import progressbar
-import time
 
 global counter
 
@@ -95,8 +93,8 @@ def manipulate_audio_file(path, name):
     3. Change speed of audio (slow down/speed up)
     """
     audio = AudioSegment.from_wav(path)
-    decide_vol = False
-    decide_speed = False
+    decide_vol = True
+    decide_speed = True
     decide_background = True
 
     if decide_background:
@@ -185,7 +183,6 @@ def search_in_folder(path):
     global changed_counter
     for file in os.scandir(path):
         if "train" in file.path:
-
             if not file.is_file():
                 search_in_folder(file)
             else:
