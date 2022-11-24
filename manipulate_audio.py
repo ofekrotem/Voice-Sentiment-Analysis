@@ -1,13 +1,13 @@
 import operator
-import os
 import random
 
 import pydub.effects
-from pydub import AudioSegment
-from random_word import RandomWords
-from youtubesearchpython import *
 
 import convert_wavs
+from pydub import AudioSegment
+import os
+import progressbar
+import time
 
 global counter
 
@@ -95,9 +95,9 @@ def manipulate_audio_file(path, name):
     3. Change speed of audio (slow down/speed up)
     """
     audio = AudioSegment.from_wav(path)
-    decide_vol = True
-    decide_speed = True
-    decide_background = False
+    decide_vol = False
+    decide_speed = False
+    decide_background = True
 
     if decide_background:
         audio = add_background_noise(audio)
@@ -193,19 +193,6 @@ def search_in_folder(path):
                     manipulate_audio_file(file.path, file.name)
 
 
-def Auto_background_noises_manipulator():
-    RW = RandomWords()
-    for i in range(0, 1):
-        word = RW.get_random_word()
-        print(f"The selected word is: {word}")
-        video_search = VideosSearch(word, 3, 'en')
-        for video in video_search.result()["result"]:
-            print(video["title"])
-            print(video["link"])
-            print("*******************************************************************")
-
-
-Auto_background_noises_manipulator()
-# search_in_folder('./data')
+search_in_folder('./data')
 
 print(f"Manipulated: {changed_counter} files")
