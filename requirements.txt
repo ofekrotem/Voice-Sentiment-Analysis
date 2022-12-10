@@ -9,3 +9,8 @@ matplotlib
 pyaudio
 tensorflow
 Random-Word
+pydub
+youtube-search-python
+youtube-dl
+speechbrain
+tf-nightly
