@@ -1,9 +1,10 @@
-
 import numpy as np
 import pandas as pd
-import pickle
 import tqdm
 import os
+
+import torchaudio
+from speechbrain.pretrained import EncoderClassifier
 
 from utils import get_label, extract_feature, get_first_letters
 from collections import defaultdict
@@ -12,8 +13,9 @@ from collections import defaultdict
 class AudioExtractor:
     """A class that is used to featurize audio clips, and provide
     them to the machine learning algorithms for training and testing"""
+
     def __init__(self, audio_config=None, verbose=1, features_folder_name="features", classification=True,
-                    emotions=['sad', 'neutral', 'happy'], balance=True):
+                 emotions=['sad', 'neutral', 'happy'], balance=True):
         """
         Params:
             audio_config (dict): the dictionary that indicates what features to extract from the audio file,
@@ -25,7 +27,8 @@ class AudioExtractor:
             emotions (list): list of emotions to be extracted, default is ['sad', 'neutral', 'happy']
             balance (bool): whether to balance dataset (both training and testing), default is True
         """
-        self.audio_config = audio_config if audio_config else {'mfcc': True, 'chroma': True, 'mel': True, 'contrast': False, 'tonnetz': False}
+        self.audio_config = audio_config if audio_config else {'mfcc': True, 'chroma': True, 'mel': True,
+                                                               'contrast': False, 'tonnetz': False}
         self.verbose = verbose
         self.features_folder_name = features_folder_name
         self.classification = classification
@@ -50,7 +53,7 @@ class AudioExtractor:
     def load_train_data(self, desc_files=["train_speech.csv"], shuffle=False):
         """Loads training data from the metadata files `desc_files`"""
         self._load_data(desc_files, "train", shuffle)
-        
+
     def load_test_data(self, desc_files=["test_speech.csv"], shuffle=False):
         """Loads testing data from the metadata files `desc_files`"""
         self._load_data(desc_files, "test", shuffle)
@@ -58,10 +61,12 @@ class AudioExtractor:
     def shuffle_data_by_partition(self, partition):
         if partition == "train":
             self.train_audio_paths, self.train_emotions, self.train_features = shuffle_data(self.train_audio_paths,
-            self.train_emotions, self.train_features)
+                                                                                            self.train_emotions,
+                                                                                            self.train_features)
         elif partition == "test":
             self.test_audio_paths, self.test_emotions, self.test_features = shuffle_data(self.test_audio_paths,
-            self.test_emotions, self.test_features)
+                                                                                         self.test_emotions,
+                                                                                         self.test_features)
         else:
             raise TypeError("Invalid partition, must be either train/test")
 
@@ -89,8 +94,9 @@ class AudioExtractor:
             elif len(self.emotions) == 5:
                 self.categories = {'angry': 1, 'sad': 2, 'neutral': 3, 'ps': 4, 'happy': 5}
             else:
-                raise TypeError("Regression is only for either ['sad', 'neutral', 'happy'] or ['angry', 'sad', 'neutral', 'ps', 'happy']")
-            emotions = [ self.categories[e] for e in emotions ]
+                raise TypeError(
+                    "Regression is only for either ['sad', 'neutral', 'happy'] or ['angry', 'sad', 'neutral', 'ps', 'happy']")
+            emotions = [self.categories[e] for e in emotions]
         # make features folder if does not exist
         if not os.path.isdir(self.features_folder_name):
             os.mkdir(self.features_folder_name)
@@ -109,13 +115,26 @@ class AudioExtractor:
             # file does not exist, extract those features and dump them into the file
             features = []
             append = features.append
+            classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb",
+                                                        savedir="pretrained_models/spkrec-xvect-voxceleb")
+            path_counter = 0
             for audio_file in tqdm.tqdm(audio_paths, f"Extracting features for {partition}"):
                 feature = extract_feature(audio_file, **self.audio_config)
                 if self.input_dimension is None:
                     self.input_dimension = feature.shape[0]
+
+                signal, fs = torchaudio.load(audio_paths[path_counter])
+                path_counter = path_counter + 1
+                embeddings = classifier.encode_batch(signal)
+                embeddings = embeddings.detach().cpu().numpy()
+                embedding = embeddings[0][0]
+                print(f"({len(feature)}) features before adding x: {feature}")
+                feature = np.concatenate((feature, embedding))
+                print(f"({len(feature)}) features after adding x: {feature}")
                 append(feature)
             # convert to numpy array
             features = np.array(features)
+            print(f"({len(features)}) features: {features}")
             # save it
             np.save(name, features)
         if partition == "train":
@@ -131,6 +150,7 @@ class AudioExtractor:
                 self.train_audio_paths += audio_paths
                 self.train_emotions += emotions
                 self.train_features = np.vstack((self.train_features, features))
+                print(f"train features: {self.train_features}")
         elif partition == "test":
             try:
                 self.test_audio_paths
@@ -158,15 +178,15 @@ class AudioExtractor:
             audio_paths = self.test_audio_paths
         else:
             raise TypeError("Invalid partition, must be either train/test")
-        
+
         count = []
         if self.classification:
             for emotion in self.emotions:
-                count.append(len([ e for e in emotions if e == emotion]))
+                count.append(len([e for e in emotions if e == emotion]))
         else:
             # regression, take actual numbers, not label emotion
             for emotion in self.categories.values():
-                count.append(len([ e for e in emotions if e == emotion]))
+                count.append(len([e for e in emotions if e == emotion]))
         # get the minimum data samples to balance to
         minimum = min(count)
         if minimum == 0:
@@ -178,9 +198,9 @@ class AudioExtractor:
             print("[*] Balancing the dataset to the minimum value:", minimum)
         d = defaultdict(list)
         if self.classification:
-            counter = {e: 0 for e in self.emotions }
+            counter = {e: 0 for e in self.emotions}
         else:
-            counter = { e: 0 for e in self.categories.values() }
+            counter = {e: 0 for e in self.categories.values()}
         for emotion, feature, audio_path in zip(emotions, features, audio_paths):
             if counter[emotion] >= minimum:
                 # minimum value exceeded
@@ -194,7 +214,7 @@ class AudioExtractor:
                 emotions.append(emotion)
                 features.append(feature)
                 audio_paths.append(audio_path)
-        
+
         if partition == "train":
             self.train_emotions = emotions
             self.train_features = features
@@ -211,7 +231,7 @@ class AudioExtractor:
 
     def balance_testing_data(self):
         self._balance_data("test")
-        
+
 
 def shuffle_data(audio_paths, emotions, features):
     """ Shuffle the data (called after making a complete pass through 
@@ -222,17 +242,17 @@ def shuffle_data(audio_paths, emotions, features):
         features (list): features audio clips
     """
     p = np.random.permutation(len(audio_paths))
-    audio_paths = [audio_paths[i] for i in p] 
+    audio_paths = [audio_paths[i] for i in p]
     emotions = [emotions[i] for i in p]
     features = [features[i] for i in p]
     return audio_paths, emotions, features
 
 
 def load_data(train_desc_files, test_desc_files, audio_config=None, classification=True, shuffle=True,
-                balance=True, emotions=['sad', 'neutral', 'happy']):
+              balance=True, emotions=['sad', 'neutral', 'happy']):
     # instantiate the class
     audiogen = AudioExtractor(audio_config=audio_config, classification=classification, emotions=emotions,
-                                balance=balance, verbose=0)
+                              balance=balance, verbose=0)
     # Loads training data
     audiogen.load_train_data(train_desc_files, shuffle=shuffle)
     # Loads testing data

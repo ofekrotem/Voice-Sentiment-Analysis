@@ -1,12 +1,10 @@
 from emotion_recognition import EmotionRecognizer
 
 import pyaudio
-import os
 import wave
 from sys import byteorder
 from array import array
 from struct import pack
-from sklearn.ensemble import GradientBoostingClassifier, BaggingClassifier
 
 from utils import get_best_estimators
 import warnings
@@ -172,4 +170,4 @@ if __name__ == "__main__":
     result = detector.predict_proba(filename)
     print("Test results:")
     for emo, prob in result.items():
-        print(f"{emo}: {prob*100}%")
+        print(f"{emo}: {prob * 100}%")

@@ -15,6 +15,8 @@ import os
 import random
 import pandas as pd
 
+import torchaudio
+from speechbrain.pretrained import EncoderClassifier
 
 class EmotionRecognizer:
     """A class for training, testing and predicting emotions based on
@@ -177,6 +179,7 @@ class EmotionRecognizer:
         and predicts the emotion
         """
         feature = extract_feature(audio_path, **self.audio_config).reshape(1, -1)
+
         return self.model.predict(feature)[0]
 
     def predict_proba(self, audio_path):
@@ -184,7 +187,20 @@ class EmotionRecognizer:
         Predicts the probability of each emotion.
         """
         if self.classification:
-            feature = extract_feature(audio_path, **self.audio_config).reshape(1, -1)
+            feature = extract_feature(audio_path, **self.audio_config)
+            classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb",
+                                                        savedir="pretrained_models/spkrec-xvect-voxceleb")
+
+            signal, fs = torchaudio.load(audio_path)
+            embeddings = classifier.encode_batch(signal)
+            embeddings = embeddings.detach().cpu().numpy()
+            embedding = embeddings[0][0]
+            print(f"({len(feature)}) features before adding x: {feature}")
+            feature = np.concatenate((feature, embedding)).reshape(1, -1)
+            print(f"({len(feature[0])}) features after adding x: {feature}")
+
+
+
             proba = self.model.predict_proba(feature)[0]
             result = {}
             for emotion, prob in zip(self.model.classes_, proba):
