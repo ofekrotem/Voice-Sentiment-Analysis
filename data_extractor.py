@@ -1,13 +1,15 @@
+import os
+from collections import defaultdict
+
+import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
-import tqdm
-import os
-
 import torchaudio
+import tqdm
 from speechbrain.pretrained import EncoderClassifier
 
+from My_PCA import My_PCA
 from utils import get_label, extract_feature, get_first_letters
-from collections import defaultdict
 
 
 class AudioExtractor:
@@ -36,6 +38,15 @@ class AudioExtractor:
         self.balance = balance
         # input dimension
         self.input_dimension = None
+        self.featureCol_list = []
+        for i in range(0, 180): self.featureCol_list.append(f"Feature {i + 1}")
+        self.xVectorCol_list = []
+        for i in range(0, 512): self.xVectorCol_list.append(f"Feature {i + 1}")
+        self.combineCol_list = []
+        for i in range(0, 692): self.combineCol_list.append(f"Feature {i + 1}")
+        self.featuresDf = pd.DataFrame(columns=self.featureCol_list)
+        self.xVectorDf = pd.DataFrame(columns=self.xVectorCol_list)
+        self.combineDf = pd.DataFrame(columns=self.combineCol_list)
 
     def _load_data(self, desc_files, partition, shuffle):
         self.load_metadata_from_desc_file(desc_files, partition)
@@ -118,6 +129,7 @@ class AudioExtractor:
             classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb",
                                                         savedir="pretrained_models/spkrec-xvect-voxceleb")
             path_counter = 0
+
             for audio_file in tqdm.tqdm(audio_paths, f"Extracting features for {partition}"):
                 feature = extract_feature(audio_file, **self.audio_config)
                 if self.input_dimension is None:
@@ -128,10 +140,23 @@ class AudioExtractor:
                 embeddings = classifier.encode_batch(signal)
                 embeddings = embeddings.detach().cpu().numpy()
                 embedding = embeddings[0][0]
-                print(f"({len(feature)}) features before adding x: {feature}")
+                self.featuresDf.loc[len(self.featuresDf.index)] = (list(feature))
+                print(f"Features new rank: {self.featuresDf.shape}")
+                self.xVectorDf.loc[len(self.xVectorDf.index)] = (list(embedding))
+                print(f"xVector new rank: {self.xVectorDf.shape}")
+                # print(f"the df is:\n {testdf}")
+                # print(f"The Xvect is {len(embedding)}:\n {embedding}")
+                # print(f"({len(feature)}) features before adding x: {feature}")
                 feature = np.concatenate((feature, embedding))
-                print(f"({len(feature)}) features after adding x: {feature}")
+                self.combineDf.loc[len(self.combineDf.index)] = (list(feature))
+                print(f"Combined new rank: {self.combineDf.shape}")
+                # print(f"({len(feature)}) features after adding x: {feature}")
                 append(feature)
+            self.combineDf.to_csv("Combine.csv")
+            self.xVectorDf.to_csv("xVector.csv")
+            self.featuresDf.to_csv("features.csv")
+            # testdf.to_csv("Test_DF.csv")
+            # traindf.to_csv("Train_DF.csv")
             # convert to numpy array
             features = np.array(features)
             print(f"({len(features)}) features: {features}")
@@ -166,6 +191,25 @@ class AudioExtractor:
                 self.test_features = np.vstack((self.test_features, features))
         else:
             raise TypeError("Invalid partition, must be either train/test")
+
+    def plotPCA(self):
+        featurePCA = My_PCA(self.featuresDf, 180)
+        xVectorPCA = My_PCA(self.xVectorDf, 512)
+        combinePCA = My_PCA(self.combineDf, 692)
+        featurePCA.normalize_data(self.featureCol_list)
+        xVectorPCA.normalize_data(self.xVectorCol_list)
+        combinePCA.normalize_data(self.combineCol_list)
+        print("Finished normalizing data")
+        (featureX, featureY) = featurePCA.decide_args(1)
+        (xVectorX, xVectorY) = xVectorPCA.decide_args(1)
+        (combineX, combineY) = combinePCA.decide_args(1)
+        plt.plot(featureX, featureY, label="Features")
+        plt.plot(xVectorX, xVectorY, label="xVector")
+        plt.plot(combineX, combineY, label="Combined")
+        plt.xlabel('Features Number')
+        plt.ylabel('Accuracy %')
+        plt.legend()
+        plt.show()
 
     def _balance_data(self, partition):
         if partition == "train":
@@ -257,6 +301,7 @@ def load_data(train_desc_files, test_desc_files, audio_config=None, classificati
     audiogen.load_train_data(train_desc_files, shuffle=shuffle)
     # Loads testing data
     audiogen.load_test_data(test_desc_files, shuffle=shuffle)
+    audiogen.plotPCA()
     # X_train, X_test, y_train, y_test
     return {
         "X_train": np.array(audiogen.train_features),
