@@ -1,3 +1,4 @@
+import My_PCA
 from emotion_recognition import EmotionRecognizer
 
 import pyaudio
@@ -159,7 +160,8 @@ if __name__ == "__main__":
     args = parser.parse_args()
     all_emotions = "neutral,calm,happy,sad,angry,fear,disgust,ps,boredom"
     features = ["mfcc", "chroma", "mel"]
-    detector = EmotionRecognizer(estimator_dict[args.model], emotions=args.emotions.split(","), features=features,
+    detector = EmotionRecognizer(model=estimator_dict[args.model],
+                                 emotions=args.emotions.split(","), features=features,
                                  verbose=0)
     detector.train()
     print("Test accuracy score: {:.3f}%".format(detector.test_score() * 100))

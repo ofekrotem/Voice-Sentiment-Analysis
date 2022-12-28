@@ -16,7 +16,8 @@ class AudioExtractor:
     """A class that is used to featurize audio clips, and provide
     them to the machine learning algorithms for training and testing"""
 
-    def __init__(self, audio_config=None, verbose=1, features_folder_name="features", classification=True,
+    def __init__(self, audio_config=None, verbose=1, features_folder_name="features",
+                 classification=True,
                  emotions=['sad', 'neutral', 'happy'], balance=True):
         """
         Params:
@@ -38,15 +39,16 @@ class AudioExtractor:
         self.balance = balance
         # input dimension
         self.input_dimension = None
-        self.featureCol_list = []
-        for i in range(0, 180): self.featureCol_list.append(f"Feature {i + 1}")
-        self.xVectorCol_list = []
-        for i in range(0, 512): self.xVectorCol_list.append(f"Feature {i + 1}")
-        self.combineCol_list = []
-        for i in range(0, 692): self.combineCol_list.append(f"Feature {i + 1}")
-        self.featuresDf = pd.DataFrame(columns=self.featureCol_list)
-        self.xVectorDf = pd.DataFrame(columns=self.xVectorCol_list)
-        self.combineDf = pd.DataFrame(columns=self.combineCol_list)
+
+        # self.featureCol_list = []
+        # for i in range(0, 180): self.featureCol_list.append(f"Feature {i + 1}")
+        # self.xVectorCol_list = []
+        # for i in range(0, 512): self.xVectorCol_list.append(f"Feature {i + 1}")
+        # self.combineCol_list = []
+        # for i in range(0, 692): self.combineCol_list.append(f"Feature {i + 1}")
+        # self.featuresDf = pd.DataFrame(columns=self.featureCol_list)
+        # self.xVectorDf = pd.DataFrame(columns=self.xVectorCol_list)
+        # self.combineDf = pd.DataFrame(columns=self.combineCol_list)
 
     def _load_data(self, desc_files, partition, shuffle):
         self.load_metadata_from_desc_file(desc_files, partition)
@@ -140,26 +142,25 @@ class AudioExtractor:
                 embeddings = classifier.encode_batch(signal)
                 embeddings = embeddings.detach().cpu().numpy()
                 embedding = embeddings[0][0]
-                self.featuresDf.loc[len(self.featuresDf.index)] = (list(feature))
-                print(f"Features new rank: {self.featuresDf.shape}")
-                self.xVectorDf.loc[len(self.xVectorDf.index)] = (list(embedding))
-                print(f"xVector new rank: {self.xVectorDf.shape}")
+                # self.featuresDf.loc[len(self.featuresDf.index)] = (list(feature))
+                # print(f"Features new rank: {self.featuresDf.shape}")
+                # self.xVectorDf.loc[len(self.xVectorDf.index)] = (list(embedding))
+                # print(f"xVector new rank: {self.xVectorDf.shape}")
                 # print(f"the df is:\n {testdf}")
                 # print(f"The Xvect is {len(embedding)}:\n {embedding}")
                 # print(f"({len(feature)}) features before adding x: {feature}")
                 feature = np.concatenate((feature, embedding))
-                self.combineDf.loc[len(self.combineDf.index)] = (list(feature))
-                print(f"Combined new rank: {self.combineDf.shape}")
+                # self.combineDf.loc[len(self.combineDf.index)] = (list(feature))
+                # print(f"Combined new rank: {self.combineDf.shape}")
                 # print(f"({len(feature)}) features after adding x: {feature}")
                 append(feature)
-            self.combineDf.to_csv("Combine.csv")
-            self.xVectorDf.to_csv("xVector.csv")
-            self.featuresDf.to_csv("features.csv")
+            # self.combineDf.to_csv("Combine.csv")
+            # self.xVectorDf.to_csv("xVector.csv")
+            # self.featuresDf.to_csv("features.csv")
             # testdf.to_csv("Test_DF.csv")
             # traindf.to_csv("Train_DF.csv")
             # convert to numpy array
             features = np.array(features)
-            print(f"({len(features)}) features: {features}")
             # save it
             np.save(name, features)
         if partition == "train":
@@ -169,6 +170,8 @@ class AudioExtractor:
                 self.train_audio_paths = audio_paths
                 self.train_emotions = emotions
                 self.train_features = features
+                print(f"Trainnnnnnn : {self.train_features.shape}")
+                print(f"Trainnnnnnn : {self.train_features}")
             else:
                 if self.verbose:
                     print("[*] Adding additional training samples")
@@ -207,7 +210,7 @@ class AudioExtractor:
         plt.plot(xVectorX, xVectorY, label="xVector")
         plt.plot(combineX, combineY, label="Combined")
         plt.xlabel('Features Number')
-        plt.ylabel('Accuracy %')
+        plt.ylabel('Variance Conservation %')
         plt.legend()
         plt.show()
 
@@ -292,20 +295,29 @@ def shuffle_data(audio_paths, emotions, features):
     return audio_paths, emotions, features
 
 
-def load_data(train_desc_files, test_desc_files, audio_config=None, classification=True, shuffle=True,
+def executePCA(trainX, testX):
+    pca = My_PCA(trainX, testX)
+    pca.executePCA()
+    return pca.df1, pca.df2
+
+
+def load_data(train_desc_files, test_desc_files, audio_config=None, classification=True,
+              shuffle=True,
               balance=True, emotions=['sad', 'neutral', 'happy']):
     # instantiate the class
-    audiogen = AudioExtractor(audio_config=audio_config, classification=classification, emotions=emotions,
+    audiogen = AudioExtractor(audio_config=audio_config,
+                              classification=classification, emotions=emotions,
                               balance=balance, verbose=0)
     # Loads training data
     audiogen.load_train_data(train_desc_files, shuffle=shuffle)
     # Loads testing data
     audiogen.load_test_data(test_desc_files, shuffle=shuffle)
-    audiogen.plotPCA()
+    # audiogen.plotPCA()
     # X_train, X_test, y_train, y_test
+    x_train, x_test = executePCA(audiogen.train_features, audiogen.test_features)
     return {
-        "X_train": np.array(audiogen.train_features),
-        "X_test": np.array(audiogen.test_features),
+        "X_train": x_train,
+        "X_test": x_test,
         "y_train": np.array(audiogen.train_emotions),
         "y_test": np.array(audiogen.test_emotions),
         "train_audio_paths": audiogen.train_audio_paths,

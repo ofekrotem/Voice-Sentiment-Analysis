@@ -5,27 +5,139 @@ import numpy as np
 import pandas as pd
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from kneed import KneeLocator
+from scipy import linalg
 
 
 class My_PCA:
-    def __init__(self, df, n):
-        self.pca = PCA(n_components=n)
-        self.df = df
+    number_of_components = 692
 
-    def normalize_data(self, features):
+    def __init__(self, df1, df2=None):
+        self.pca = PCA()
+        self.df1 = df1
+        self.df2 = df2
+
+    def executePCA(self):
+        # self.normalize_data()
+        # self.getMostSignificantFeatures()
+        print(f"before {self.df1[0][:20]}")
+        if My_PCA.number_of_components == 0:
+            self.findElbow()
+        if len(self.df1) == 1:
+            self.LUalgorithm()
+        else:
+            self.PCAalgorithm()
+        # self.findElbow()
+        print(f"after {self.df1[0][:20]}")
+
+    def findKnee(self):
+        x = []
+        y = []
+        sum = 0
+        for i in range(len(self.eigen_pairs)):
+            x.append(i)
+            sum = sum + self.eigen_pairs[i][0]
+            y.append(sum)
+        kn = KneeLocator(
+            x,
+            y,
+            curve='convex',
+            direction='increasing',
+            interp_method='polynomial',
+        )
+        print(f"Knee of the graph is: {kn.knee}")
+        kn.plot_knee()
+        My_PCA.number_of_components = kn.knee
+
+    def normalize_data(self):
         # Separating out the features
-        x = self.df.loc[:, features].values
+        # x = self.df.loc[:, features].values
         # Standardizing the features
-        x = StandardScaler().fit_transform(x)
-        principalComponents = self.pca.fit_transform(x)
-        self.df = pd.DataFrame(data=principalComponents, columns=[features])
+        if len(self.df) > 1:
+            x = StandardScaler().fit_transform(self.df)
+            principalComponents = self.pca.fit_transform(x)
+            self.df = pd.DataFrame(data=principalComponents)
         print(f"The dataset after Normalize is:\n {self.df}\n")
+
+    def findElbow(self):
+        pca = PCA()
+        pca.fit(self.df)
+        feat_lst = pca.explained_variance_ratio_
+        print(f"The feat list is: {feat_lst}\n The length is {feat_lst.shape}")
+        x = []
+        y = []
+        counter = 0
+        sum = 0
+        for f in feat_lst:
+            sum = sum + f
+            counter = counter + 1
+            x.append(counter)
+            y.append(sum)
+
+        kn = KneeLocator(x, y, curve='convex', direction='increasing', interp_method='piecewise_polynomial')
+        My_PCA.number_of_components = kn.knee
+
+        print(f"Elbow is: {My_PCA.number_of_components}")
+        self.plot_data(x, y)
+        # My_PCA.number_of_components = 692
+
+    def LUalgorithm(self):
+        # Compute the LU decomposition of the matrix
+        P, L, U = linalg.lu(self.df1)
+        print(f"P = {P.shape} , L = {L.shape} , U = {U.shape} , df = {self.df1.shape}")
+        # Take the first four columns of U
+        matrix_transformed = U[:, :My_PCA.number_of_components]
+        print(matrix_transformed.shape)
+        self.df1 = matrix_transformed
+
+    def PCAalgorithm(self):
+        if self.df2 is not None:
+            extended = (np.append(self.df1, self.df2, axis=0))
+        pca = PCA(n_components=My_PCA.number_of_components)
+        scaler = StandardScaler()
+        scaler.fit(extended)
+        scaled_data = scaler.transform(extended)
+        result = pca.fit_transform(scaled_data)
+        self.df1 = result[:len(self.df1)]
+        self.df2 = result[len(self.df1):]
+
+    def getMostSignificantFeatures(self):
+
+        # self.covMat = np.cov(self.df)
+        # print(f"cov = {type(self.covMat)}")
+        # print("Finished calculating cov matrix")
+        # eigenvalues, eigenvectors = np.linalg.eig(self.covMat)
+        # self.eigen_pairs = [(eigenvalues[i], eigenvectors[:, i]) for i in range(len(eigenvalues))]
+        # self.eigen_pairs.sort(key=lambda x: x[0], reverse=True)
+        # print("Finished calculating eigen_pairs")
+        # if self.number_of_components is None:
+        #     self.findKnee()
+        # col_list = []
+        # for i in range(self.number_of_components): col_list.append(f"Feature {i + 1}")
+        # result_df = pd.DataFrame(columns=col_list)
+        # eigenvectors = []
+        # for pair in self.eigen_pairs: eigenvectors.append(pair[1])
+        # total_num_of_iterations = (len(self.df)) * self.number_of_components * len(eigenvectors)
+        # counter = 0
+        # for index, row in self.df.iterrows():
+        #     new_row = []
+        #     for column_index in range(self.number_of_components):
+        #         sum = 0
+        #         for eigenvectors_index in range(len(eigenvectors)):
+        #             sum = sum + (float(row[column_index]) * float(eigenvectors[column_index][eigenvectors_index]))
+        #             # print(
+        #             # f"Iteration: {counter} / {total_num_of_iterations} = {(counter / total_num_of_iterations) * 100}%\tFeatures to take: {self.number_of_components} ")
+        #             counter = counter + 1
+        #         new_row.append(sum)
+        #     result_df.loc[len(result_df)] = new_row
+        # self.df = result_df
+        print(f"after {self.df[0][:20]}")
 
     def decide_args(self, accuracy):
         print("Entered decide_args")
-        covMat = np.cov(self.df)
+        self.covMat = np.cov(self.df)
         feat_lst = self.pca.explained_variance_ratio_
-        eigenvalues, eigenvectors = np.linalg.eig(covMat)
+        eigenvalues, eigenvectors = np.linalg.eig(self.covMat)
         eigen_pairs = [(eigenvalues[i], eigenvectors[:, i]) for i in range(len(eigenvalues))]
         eigen_pairs.sort(key=lambda x: x[0], reverse=True)
         full_dict = {}
@@ -52,12 +164,3 @@ class My_PCA:
         plt.xlabel('Features Number')
         plt.ylabel('Accuracy %')
         plt.show()
-
-col_list=[]
-for i in range(0,3): col_list.append(f"Feature {i+1}")
-data = pd.DataFrame([[0, 0, 3],
-                  [0, -5, 5],
-                  [0, 15, 6]],columns=['X','Y','Z'])
-pca = My_PCA(data,3)
-pca.normalize_data(['X','Y','Z'])
-pca.decide_args(0.98)
