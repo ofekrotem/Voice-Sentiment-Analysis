@@ -10,44 +10,21 @@ from scipy import linalg
 
 
 class My_PCA:
-    number_of_components = 692
+    number_of_components = 0
 
     def __init__(self, df1, df2=None):
         self.pca = PCA()
         self.df1 = df1
         self.df2 = df2
+        self.combined = None
 
     def executePCA(self):
-        # self.normalize_data()
-        # self.getMostSignificantFeatures()
-        print(f"before {self.df1[0][:20]}")
         if My_PCA.number_of_components == 0:
             self.findElbow()
         if len(self.df1) == 1:
             self.LUalgorithm()
         else:
             self.PCAalgorithm()
-        # self.findElbow()
-        print(f"after {self.df1[0][:20]}")
-
-    def findKnee(self):
-        x = []
-        y = []
-        sum = 0
-        for i in range(len(self.eigen_pairs)):
-            x.append(i)
-            sum = sum + self.eigen_pairs[i][0]
-            y.append(sum)
-        kn = KneeLocator(
-            x,
-            y,
-            curve='convex',
-            direction='increasing',
-            interp_method='polynomial',
-        )
-        print(f"Knee of the graph is: {kn.knee}")
-        kn.plot_knee()
-        My_PCA.number_of_components = kn.knee
 
     def normalize_data(self):
         # Separating out the features
@@ -60,10 +37,10 @@ class My_PCA:
         print(f"The dataset after Normalize is:\n {self.df}\n")
 
     def findElbow(self):
+        self.combined = (np.append(self.df1, self.df2, axis=0))
         pca = PCA()
-        pca.fit(self.df)
+        pca.fit(self.combined)
         feat_lst = pca.explained_variance_ratio_
-        print(f"The feat list is: {feat_lst}\n The length is {feat_lst.shape}")
         x = []
         y = []
         counter = 0
@@ -74,8 +51,8 @@ class My_PCA:
             x.append(counter)
             y.append(sum)
 
-        kn = KneeLocator(x, y, curve='convex', direction='increasing', interp_method='piecewise_polynomial')
-        My_PCA.number_of_components = kn.knee
+        kn = KneeLocator(x, y, curve='concave', direction='increasing', interp_method='polynomial')
+        My_PCA.number_of_components = kn.elbow
 
         print(f"Elbow is: {My_PCA.number_of_components}")
         self.plot_data(x, y)
@@ -92,7 +69,9 @@ class My_PCA:
 
     def PCAalgorithm(self):
         if self.df2 is not None:
-            extended = (np.append(self.df1, self.df2, axis=0))
+            extended = self.combined
+        else:
+            extended = self.df1
         pca = PCA(n_components=My_PCA.number_of_components)
         scaler = StandardScaler()
         scaler.fit(extended)
