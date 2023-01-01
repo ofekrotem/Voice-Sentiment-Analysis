@@ -1,7 +1,6 @@
 import os
 from collections import defaultdict
 
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import torchaudio
@@ -39,16 +38,6 @@ class AudioExtractor:
         self.balance = balance
         # input dimension
         self.input_dimension = None
-
-        # self.featureCol_list = []
-        # for i in range(0, 180): self.featureCol_list.append(f"Feature {i + 1}")
-        # self.xVectorCol_list = []
-        # for i in range(0, 512): self.xVectorCol_list.append(f"Feature {i + 1}")
-        # self.combineCol_list = []
-        # for i in range(0, 692): self.combineCol_list.append(f"Feature {i + 1}")
-        # self.featuresDf = pd.DataFrame(columns=self.featureCol_list)
-        # self.xVectorDf = pd.DataFrame(columns=self.xVectorCol_list)
-        # self.combineDf = pd.DataFrame(columns=self.combineCol_list)
 
     def _load_data(self, desc_files, partition, shuffle):
         self.load_metadata_from_desc_file(desc_files, partition)
@@ -128,37 +117,18 @@ class AudioExtractor:
             # file does not exist, extract those features and dump them into the file
             features = []
             append = features.append
+
+            path_counter = 0
             classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb",
                                                         savedir="pretrained_models/spkrec-xvect-voxceleb")
-            path_counter = 0
-
             for audio_file in tqdm.tqdm(audio_paths, f"Extracting features for {partition}"):
                 feature = extract_feature(audio_file, **self.audio_config)
                 if self.input_dimension is None:
                     self.input_dimension = feature.shape[0]
-
-                signal, fs = torchaudio.load(audio_paths[path_counter])
+                xVector = extract_xVector(audio_paths[path_counter], classifier)
                 path_counter = path_counter + 1
-                embeddings = classifier.encode_batch(signal)
-                embeddings = embeddings.detach().cpu().numpy()
-                embedding = embeddings[0][0]
-                # self.featuresDf.loc[len(self.featuresDf.index)] = (list(feature))
-                # print(f"Features new rank: {self.featuresDf.shape}")
-                # self.xVectorDf.loc[len(self.xVectorDf.index)] = (list(embedding))
-                # print(f"xVector new rank: {self.xVectorDf.shape}")
-                # print(f"the df is:\n {testdf}")
-                # print(f"The Xvect is {len(embedding)}:\n {embedding}")
-                # print(f"({len(feature)}) features before adding x: {feature}")
-                feature = np.concatenate((feature, embedding))
-                # self.combineDf.loc[len(self.combineDf.index)] = (list(feature))
-                # print(f"Combined new rank: {self.combineDf.shape}")
-                # print(f"({len(feature)}) features after adding x: {feature}")
+                feature = np.concatenate((feature, xVector))
                 append(feature)
-            # self.combineDf.to_csv("Combine.csv")
-            # self.xVectorDf.to_csv("xVector.csv")
-            # self.featuresDf.to_csv("features.csv")
-            # testdf.to_csv("Test_DF.csv")
-            # traindf.to_csv("Train_DF.csv")
             # convert to numpy array
             features = np.array(features)
             # save it
@@ -170,15 +140,13 @@ class AudioExtractor:
                 self.train_audio_paths = audio_paths
                 self.train_emotions = emotions
                 self.train_features = features
-                print(f"Trainnnnnnn : {self.train_features.shape}")
-                print(f"Trainnnnnnn : {self.train_features}")
             else:
                 if self.verbose:
                     print("[*] Adding additional training samples")
                 self.train_audio_paths += audio_paths
                 self.train_emotions += emotions
                 self.train_features = np.vstack((self.train_features, features))
-                print(f"train features: {self.train_features}")
+
         elif partition == "test":
             try:
                 self.test_audio_paths
@@ -194,25 +162,6 @@ class AudioExtractor:
                 self.test_features = np.vstack((self.test_features, features))
         else:
             raise TypeError("Invalid partition, must be either train/test")
-
-    def plotPCA(self):
-        featurePCA = My_PCA(self.featuresDf, 180)
-        xVectorPCA = My_PCA(self.xVectorDf, 512)
-        combinePCA = My_PCA(self.combineDf, 692)
-        featurePCA.normalize_data(self.featureCol_list)
-        xVectorPCA.normalize_data(self.xVectorCol_list)
-        combinePCA.normalize_data(self.combineCol_list)
-        print("Finished normalizing data")
-        (featureX, featureY) = featurePCA.decide_args(1)
-        (xVectorX, xVectorY) = xVectorPCA.decide_args(1)
-        (combineX, combineY) = combinePCA.decide_args(1)
-        plt.plot(featureX, featureY, label="Features")
-        plt.plot(xVectorX, xVectorY, label="xVector")
-        plt.plot(combineX, combineY, label="Combined")
-        plt.xlabel('Features Number')
-        plt.ylabel('Variance Conservation %')
-        plt.legend()
-        plt.show()
 
     def _balance_data(self, partition):
         if partition == "train":
@@ -295,10 +244,20 @@ def shuffle_data(audio_paths, emotions, features):
     return audio_paths, emotions, features
 
 
-def executePCA(trainX, testX):
-    pca = My_PCA(trainX, testX)
+def executePCA(df1, df2=None):
+    if df2:
+        pca = My_PCA(df1, df2)
+    else:
+        pca = My_PCA(df1)
     pca.executePCA()
     return pca.df1, pca.df2
+
+
+def extract_xVector(audio_path, classifier):
+    signal, fs = torchaudio.load(audio_path)
+    embeddings = classifier.encode_batch(signal)
+    embeddings = embeddings.detach().cpu().numpy()
+    return embeddings[0][0]
 
 
 def load_data(train_desc_files, test_desc_files, audio_config=None, classification=True,
@@ -312,7 +271,6 @@ def load_data(train_desc_files, test_desc_files, audio_config=None, classificati
     audiogen.load_train_data(train_desc_files, shuffle=shuffle)
     # Loads testing data
     audiogen.load_test_data(test_desc_files, shuffle=shuffle)
-    # audiogen.plotPCA()
     # X_train, X_test, y_train, y_test
     x_train, x_test = executePCA(audiogen.train_features, audiogen.test_features)
     return {

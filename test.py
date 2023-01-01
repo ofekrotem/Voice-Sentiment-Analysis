@@ -1,4 +1,3 @@
-import My_PCA
 from emotion_recognition import EmotionRecognizer
 
 import pyaudio

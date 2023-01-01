@@ -1,5 +1,6 @@
-from My_PCA import My_PCA
-from data_extractor import load_data
+from speechbrain.pretrained import EncoderClassifier
+
+from data_extractor import load_data, extract_xVector, executePCA
 from utils import extract_feature, AVAILABLE_EMOTIONS
 from create_csv import write_emodb_csv, write_tess_ravdess_csv, write_custom_csv
 
@@ -15,9 +16,6 @@ import tqdm
 import os
 import random
 import pandas as pd
-
-import torchaudio
-from speechbrain.pretrained import EncoderClassifier
 
 
 class EmotionRecognizer:
@@ -156,13 +154,9 @@ class EmotionRecognizer:
                                self.classification,
                                emotions=self.emotions, balance=self.balance)
             self.X_train = result['X_train']
-            print(f"X_train = {self.X_train.shape}")
             self.X_test = result['X_test']
-            print(f"X_test = {self.X_test.shape}")
             self.y_train = result['y_train']
-            print(f"Y_train = {self.y_train.shape}")
             self.y_test = result['y_test']
-            print(f"Y_test = {self.y_test.shape}")
             self.train_audio_paths = result['train_audio_paths']
             self.test_audio_paths = result['test_audio_paths']
             self.balance = result["balance"]
@@ -200,18 +194,9 @@ class EmotionRecognizer:
             feature = extract_feature(audio_path, **self.audio_config)
             classifier = EncoderClassifier.from_hparams(source="speechbrain/spkrec-xvect-voxceleb",
                                                         savedir="pretrained_models/spkrec-xvect-voxceleb")
-
-            signal, fs = torchaudio.load(audio_path)
-            embeddings = classifier.encode_batch(signal)
-            embeddings = embeddings.detach().cpu().numpy()
-            embedding = embeddings[0][0]
-            print(f"({feature.shape}) features before adding x")
-            feature = np.concatenate((feature, embedding)).reshape(1, -1)
-            print(f"({feature.shape}) features after adding x")
-            pca = My_PCA(feature)
-            pca.executePCA()
-            feature = pca.df1
-            print(f"({feature.shape}) after PCA with {My_PCA.number_of_components} features")
+            xVector = extract_xVector(audio_path, classifier)
+            feature = np.concatenate((feature, xVector)).reshape(1, -1)
+            feature = executePCA(feature)[0]
 
             proba = self.model.predict_proba(feature)[0]
             result = {}
