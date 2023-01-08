@@ -69,4 +69,5 @@ class My_PCA:
         plt.scatter(num, acc)
         plt.xlabel('Features Number')
         plt.ylabel('Accuracy %')
+        plt.title("Features taken vs Variance preserved\nClose to continue execution")
         plt.show()

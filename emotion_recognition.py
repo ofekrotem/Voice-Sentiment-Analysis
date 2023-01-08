@@ -13,6 +13,7 @@ from time import time
 from utils import get_best_estimators, get_audio_config
 import numpy as np
 import tqdm
+import time
 import os
 import random
 import pandas as pd
@@ -197,7 +198,6 @@ class EmotionRecognizer:
             xVector = extract_xVector(audio_path, classifier)
             feature = np.concatenate((feature, xVector)).reshape(1, -1)
             feature = executePCA(feature)[0]
-
             proba = self.model.predict_proba(feature)[0]
             result = {}
             for emotion, prob in zip(self.model.classes_, proba):

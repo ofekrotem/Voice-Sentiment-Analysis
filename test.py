@@ -1,3 +1,5 @@
+import time
+
 from emotion_recognition import EmotionRecognizer
 
 import pyaudio
@@ -165,7 +167,6 @@ if __name__ == "__main__":
     detector.train()
     print("Test accuracy score: {:.3f}%".format(detector.test_score() * 100))
     print("Please talk")
-
     filename = "test.wav"
     record_to_file(filename)
     result = detector.predict_proba(filename)

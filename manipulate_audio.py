@@ -100,8 +100,10 @@ global changed_counter
 changed_counter = 0
 global noise_list
 noise_list = []
-for file in os.scandir('./background_noises'):
-    noise_list.append(file.name)
+
+
+# for file in os.scandir('./background_noises'):
+#     noise_list.append(file.name)
 
 
 def add_background_noise(audio):
@@ -168,6 +170,27 @@ def save_with_new_emotion(audio, path, is_dot, emotion):
     print(f"saved {path} as {new_path}")
 
 
+def get_emotion_from_name(name):
+    if '_' in name:
+        start_index = name.rfind('_') + 1
+        end_index = name.rfind('.')
+        emotion = name[start_index:end_index]
+    else:
+        index = name.rfind('.')
+        emotion = name[index - 2:index - 1]
+    positive_emotions = ["F", "happy"]
+    negative_emotions = ["T", "sad"]
+    neutral_emotions = ["neutral", "N"]
+    if emotion in positive_emotions:
+        return "happy"
+    elif emotion in negative_emotions:
+        return "sad"
+    elif emotion in neutral_emotions:
+        return "neutral"
+    else:
+        pass
+
+
 def unite_data_to_three_emotions(path, name):
     """
     Helper function to change from original dataset, to a dataset with 3 emotions - happy,sad,neutral
@@ -216,18 +239,25 @@ def unite_data_to_three_emotions(path, name):
         pass
 
 
+global emotions
+emotions = {"happy": 0, "sad": 0, "neutral": 0}
+
+
 def search_in_folder(path):
     """
     Search in path folder for all files (not folders)
     """
     global changed_counter
+    global emotions
+
     for file in os.scandir(path):
-        if "train" in file.path:
-            if not file.is_file():
-                search_in_folder(file)
-            else:
-                if decide_manipulate():
-                    manipulate_audio_file(file.path, file.name)
+        if not file.is_file():
+            search_in_folder(file)
+        else:
+            curr_emotion = get_emotion_from_name(file.name)
+            curr_count = emotions.get(curr_emotion)
+            emotions.update({curr_emotion: (curr_count + 1)})
+    print(emotions)
 
 
 def youtube2wav(link, word, counter):
@@ -294,6 +324,7 @@ def Auto_background_noises_generator():
 
 
 # Auto_background_noises_generator()
-search_in_folder('./data')
+search_in_folder('./data/training')
+search_in_folder('./data/validation')
 
-print(f"Manipulated: {changed_counter} files")
+# print(f"Manipulated: {changed_counter} files")
